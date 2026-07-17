@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>CAPTION SYNC TRAINER — 字幕打鍵トレーナー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0A0D0F;
+    --panel: #12171A;
+    --panel-raised: #161C1F;
+    --line: #262E32;
+    --line-soft: #1B2124;
+    --text: #E7ECEE;
+    --text-muted: #7C8A90;
+    --green: #2FE6A6;
+    --green-dim: rgba(47,230,166,0.10);
+    --amber: #FFB020;
+    --red: #FF5A5F;
+    --font-display: 'Zen Kaku Gothic New', sans-serif;
+    --font-body: 'Noto Sans JP', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+
+  /* header */
+  .masthead{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px;}
+  .masthead h1{
+    font-family:var(--font-display);font-weight:900;letter-spacing:0.02em;
+    font-size:22px;margin:0;color:var(--text);
+  }
+  .masthead h1 span{color:var(--green);}
+  .masthead .sub{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);letter-spacing:0.06em;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:20px;margin-bottom:16px;}
+  .panel-title{font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  .panel-title::before{content:'';width:6px;height:6px;background:var(--green);display:inline-block;border-radius:50%;}
+
+  label{display:block;font-size:13px;color:var(--text-muted);margin-bottom:6px;}
+  input[type=text], textarea{
+    width:100%;background:var(--panel-raised);border:1px solid var(--line);border-radius:3px;
+    color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 12px;
+    outline:none;
+  }
+  input[type=text]:focus, textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  textarea{min-height:130px;resize:vertical;line-height:1.6;}
+  .field{margin-bottom:14px;}
+  .hint{font-size:11.5px;color:var(--text-muted);margin-top:6px;line-height:1.6;}
+  .hint b{color:var(--amber);font-weight:500;}
+
+  button{
+    font-family:var(--font-body);font-weight:700;font-size:14px;
+    background:var(--green);color:#06110D;border:none;border-radius:3px;
+    padding:11px 20px;cursor:pointer;letter-spacing:0.02em;
+  }
+  button:hover{filter:brightness(1.08);}
+  button.secondary{background:transparent;color:var(--text);border:1px solid var(--line);}
+  button.secondary:hover{border-color:var(--text-muted);}
+  button:disabled{opacity:0.35;cursor:not-allowed;}
+
+  .hidden{display:none !important;}
+
+  /* video + CG box */
+  #playerHost{width:100%;aspect-ratio:16/9;background:#000;border-radius:3px;overflow:hidden;border:1px solid var(--line);}
+
+  .timecode-strip{
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--font-mono);font-size:12px;color:var(--text-muted);
+    padding:8px 2px 0;
+  }
+  .timecode-strip .tc{color:var(--green);letter-spacing:0.05em;}
+  .rec-dot{width:7px;height:7px;border-radius:50%;background:var(--red);display:inline-block;margin-right:6px;animation:blink 1.4s infinite;}
+  @keyframes blink{50%{opacity:0.25;}}
+
+  /* the CG caption target box */
+  .cg-box{
+    margin-top:14px;background:#000;border:1px solid var(--line);border-radius:3px;
+    padding:20px 18px;min-height:96px;position:relative;
+  }
+  .cg-label{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.14em;margin-bottom:10px;text-transform:uppercase;}
+  .cg-text{font-family:var(--font-body);font-size:22px;line-height:1.7;font-weight:500;color:#F3F6F5;min-height:38px;word-break:break-word;}
+  .cg-waiting{color:var(--text-muted);font-family:var(--font-mono);font-size:13px;}
+  .cg-next{margin-top:8px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono);}
+
+  .input-row{display:flex;gap:10px;margin-top:14px;}
+  #typeInput{flex:1;font-size:16px;padding:12px 14px;}
+  #typeInput.correct{border-color:var(--green);}
+  #typeInput.wrong{border-color:var(--red);}
+
+  /* live stats row */
+  .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;}
+  .stat{background:var(--panel-raised);border:1px solid var(--line);border-radius:3px;padding:12px 14px;}
+  .stat .k{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;}
+  .stat .v{font-family:var(--font-mono);font-size:22px;font-weight:700;margin-top:4px;color:var(--text);}
+  .stat .v.good{color:var(--green);}
+  .stat .v.warn{color:var(--amber);}
+  .stat .v.bad{color:var(--red);}
+
+  /* lag gauge */
+  .gauge-wrap{margin-top:16px;}
+  .gauge-label{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;}
+  svg#gauge{width:100%;height:auto;display:block;}
+  .needle{transition:transform 0.25s ease-out;}
+  @media (prefers-reduced-motion: reduce){ .needle{transition:none;} }
+
+  table.log{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12px;margin-top:6px;}
+  table.log th{text-align:left;color:var(--text-muted);font-weight:500;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--line);}
+  table.log td{padding:7px 8px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  table.log tr:last-child td{border-bottom:none;}
+  .tag{display:inline-block;padding:1px 6px;border-radius:2px;font-size:10px;font-weight:700;}
+  .tag.ok{background:var(--green-dim);color:var(--green);}
+  .tag.miss{background:rgba(255,90,95,0.12);color:var(--red);}
+
+  .results-hero{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .score-big{font-family:var(--font-display);font-size:56px;font-weight:900;color:var(--green);line-height:1;}
+  .score-big .unit{font-size:20px;color:var(--text-muted);margin-left:4px;}
+
+  .footer-note{font-size:11px;color:var(--text-muted);text-align:center;margin-top:30px;line-height:1.7;}
+  a{color:var(--green);}
+
+  /* mode row + builder */
+  .mode-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+  .divider-or{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;}
+  .divider-or::before,.divider-or::after{content:'';flex:1;height:1px;background:var(--line);}
+
+  .builder-row{display:flex;gap:10px;}
+  #builderInput{flex:1;}
+  .builder-list{margin-top:12px;max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:3px;}
+  .builder-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line-soft);font-family:var(--font-mono);font-size:12.5px;}
+  .builder-item:last-child{border-bottom:none;}
+  .builder-item .btime{color:var(--green);min-width:56px;}
+  .builder-item .btext{flex:1;font-family:var(--font-body);color:var(--text);}
+  .builder-item .bdel{background:transparent;border:1px solid var(--line);color:var(--text-muted);padding:3px 8px;font-size:11px;font-weight:500;}
+  .builder-item .bdel:hover{border-color:var(--red);color:var(--red);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <h1>CAPTION<span>SYNC</span>TRAINER</h1>
+    <div class="sub">LIVE SUBTITLE INPUT DRILL — ACCURACY / LAG LOGGER</div>
+  </div>
+
+  <!-- SETUP -->
+  <div id="setupPanel" class="panel">
+    <p class="panel-title">Setup — 動画とスクリプトを読み込む</p>
+
+    <div class="field">
+      <label for="videoUrl">YouTube 動画URL または動画ID</label>
+      <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=xxxxxxxxxxx">
+    </div>
+
+    <div class="field">
+      <label for="transcriptBox">正解データ（自動文字起こし／字幕テキスト）— 貼り付けがある場合のみ</label>
+      <textarea id="transcriptBox" placeholder="例）
+0:00 こんにちは、今日のニュースです
+0:04 まず最初のニュースです
+0:08 ..."></textarea>
+      <div class="hint">
+        YouTubeの動画ページで「…」→<b>文字起こしを表示</b>からタイムスタンプ付きテキストをコピーして貼り付けてください（SRT / WebVTT 形式もOK）。ブラウザからYouTubeの文字起こしを自動取得することはできないため、貼り付けが必要です。
+      </div>
+    </div>
+
+    <div class="mode-row">
+      <button id="startBtn">貼り付けたスクリプトで開始</button>
+    </div>
+
+    <div class="divider-or">「文字起こしを表示」の項目が無い動画（字幕自体が存在しない）の場合</div>
+
+    <div class="field">
+      <div class="hint" style="margin-top:0;">
+        「…」メニューに文字起こしの項目が出ないのは、その動画に<b>字幕（手動・自動とも）が一切用意されていない</b>ためです。再生画面の字幕（CC）ボタンを押してみて選択肢が無ければ、その動画に文字起こしはありません。別の動画を選ぶか、下の手動作成モードで動画を見ながら自分でスクリプトを作れます。
+      </div>
+      <button id="loadForBuilderBtn" class="secondary">この動画を見ながら手動でスクリプトを作成</button>
+    </div>
+
+    <div id="setupError" class="hint" style="color:var(--red);margin-top:10px;"></div>
+  </div>
+
+  <!-- VIDEO (shared by builder + game) -->
+  <div id="videoArea" class="panel hidden">
+    <p class="panel-title">Video</p>
+    <div id="playerHost"></div>
+    <div class="timecode-strip">
+      <span><span class="rec-dot"></span>PLAYING</span>
+      <span class="tc" id="tcDisplay">00:00.0</span>
+    </div>
+  </div>
+
+  <!-- BUILDER (manual transcript creation) -->
+  <div id="builderPanel" class="panel hidden">
+    <p class="panel-title">Script Builder — 動画を見ながら台詞を記録</p>
+    <div class="hint" style="margin-top:0;">動画を再生し、聞こえたセリフをそのまま入力してEnterを押すと、その時点の再生位置がタイムスタンプとして記録されます。全て記録し終えたら「テストを開始」を押してください。</div>
+    <div class="builder-row" style="margin-top:12px;">
+      <input type="text" id="builderInput" placeholder="聞こえたセリフを入力してEnter" autocomplete="off" disabled>
+    </div>
+    <div id="builderList" class="builder-list"><div class="hint" style="margin:12px;">まだ記録されていません。</div></div>
+    <div class="mode-row" style="margin-top:14px;">
+      <button id="startFromBuilderBtn" disabled>この内容でテストを開始</button>
+      <button id="builderBackBtn" class="secondary">動画選択に戻る</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="gamePanel" class="panel hidden">
+    <p class="panel-title">On Air — 音声に合わせて入力</p>
+
+    <div class="cg-box">
+      <div class="cg-label">Target Line</div>
+      <div class="cg-text" id="cgText"><span class="cg-waiting">映像を再生すると、ここに現在の字幕が表示されます</span></div>
+      <div class="cg-next" id="cgNext"></div>
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="typeInput" placeholder="表示された字幕をそのまま入力してEnter" autocomplete="off" disabled>
+      <button id="finishBtn" class="secondary">終了して結果を見る</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat"><div class="k">正解率</div><div class="v good" id="statAcc">—</div></div>
+      <div class="stat"><div class="k">平均ラグ</div><div class="v" id="statLag">—</div></div>
+      <div class="stat"><div class="k">入力済み行</div><div class="v" id="statCount">0 / 0</div></div>
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge-label">Lag Meter — 直近の入力タイミング</div>
+      <svg id="gauge" viewBox="0 0 600 90"></svg>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsPanel" class="panel hidden">
+    <p class="panel-title">Session Report — 結果ログ</p>
+    <div class="results-hero">
+      <div>
+        <div class="score-big" id="finalScore">0<span class="unit">/ 100</span></div>
+        <div class="hint">総合スコア（正解率70% + タイミング30%）</div>
+      </div>
+    </div>
+    <div class="stats-row" style="margin-top:0;">
+      <div class="stat"><div class="k">正解率</div><div class="v" id="finalAcc">—</div></div>
+      <div class="stat"><div class="k">平均ラグ</div><div class="v" id="finalLag">—</div></div>
+      <div class="stat"><div class="k">未入力行</div><div class="v" id="finalMiss">—</div></div>
+    </div>
+
+    <div style="margin-top:18px;overflow-x:auto;">
+      <table class="log" id="logTable">
+        <thead><tr><th>#</th><th>想定TC</th><th>正解テキスト</th><th>入力テキスト</th><th>正解率</th><th>ラグ</th><th>判定</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:18px;display:flex;gap:10px;">
+      <button id="downloadBtn" class="secondary">ログをCSVでダウンロード</button>
+      <button id="restartBtn">もう一度</button>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    ラグは各行の想定タイムコード（字幕開始時刻）と Enter 押下時点の再生位置の差分です。正解率は文字単位の編集距離（レーベンシュタイン距離）から算出しています。
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  let player = null;
+  let entries = [];           // {start,end,text}
+  let activeIndex = -1;       // currently targeted line
+  let submittedFlags = [];    // bool per entry
+  let log = [];                // {idx,start,expected,typed,acc,lag,status}
+  let pollTimer = null;
+  let testing = false;         // true while a typing test is actively running
+  let builderEntries = [];     // {id,start,text} recorded manually
+  let builderIdSeq = 1;
+
+  const setupPanel = document.getElementById('setupPanel');
+  const videoArea = document.getElementById('videoArea');
+  const builderPanel = document.getElementById('builderPanel');
+  const gamePanel = document.getElementById('gamePanel');
+  const resultsPanel = document.getElementById('resultsPanel');
+  const setupError = document.getElementById('setupError');
+  const typeInput = document.getElementById('typeInput');
+  const builderInput = document.getElementById('builderInput');
+  const cgText = document.getElementById('cgText');
+  const cgNext = document.getElementById('cgNext');
+  const tcDisplay = document.getElementById('tcDisplay');
+  const statAcc = document.getElementById('statAcc');
+  const statLag = document.getElementById('statLag');
+  const statCount = document.getElementById('statCount');
+
+  // ---------- helpers: time parsing ----------
+  function parseTimeToSeconds(str){
+    str = str.trim().replace(',', '.');
+    const parts = str.split(':').map(p => Number(p) || 0);
+    let sec = 0;
+    if(parts.length === 3) sec = parts[0]*3600 + parts[1]*60 + parts[2];
+    else if(parts.length === 2) sec = parts[0]*60 + parts[1];
+    else sec = parts[0] || 0;
+    return sec;
+  }
+
+  function fmtTime(sec){
+    if(sec < 0) sec = 0;
+    const m = Math.floor(sec/60);
+    const s = (sec - m*60).toFixed(1);
+    return String(m).padStart(2,'0') + ':' + String(s).padStart(4,'0');
+  }
+
+  function extractVideoId(input){
+    input = input.trim();
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
+    ];
+    for(const p of patterns){
+      const m = input.match(p);
+      if(m) return m[1];
+    }
+    if(/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+    return null;
+  }
+
+  // ---------- transcript parsing ----------
+  function parseTranscript(raw){
+    raw = raw.replace(/\r/g,'').trim();
+    const result = [];
+
+    if(raw.includes('-->')){
+      const blocks = raw.split(/\n\s*\n/);
+      for(const block of blocks){
+        const blines = block.split('\n').map(l=>l.trim()).filter(Boolean);
+        const timeLine = blines.find(l => l.includes('-->'));
+        if(!timeLine) continue;
+        const start = parseTimeToSeconds(timeLine.split('-->')[0]);
+        const textLines = blines.filter(l => l !== timeLine && !/^\d+$/.test(l) && l.toUpperCase() !== 'WEBVTT');
+        const text = textLines.join(' ').replace(/<[^>]+>/g,'').trim();
+        if(text) result.push({start, text});
+      }
+    } else {
+      const lines = raw.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+      const tsRe = /^((?:\d{1,2}:)?\d{0,2}:\d{2})/;                 // leading timecode, e.g. "1:03", "0:00", ":00", "1:02:03"
+      const dupRe = /^(?:\d{1,3}\s*分\s*)?\d{1,3}\s*秒\s*/;           // YouTube's glued screen-reader duration, e.g. "1 分 3 秒" or "20 秒"
+      let i = 0;
+      while(i < lines.length){
+        const line = lines[i];
+        const tm = line.match(tsRe);
+        if(tm){
+          const start = parseTimeToSeconds(tm[1]);
+          let rest = line.slice(tm[0].length);
+          const dm = rest.match(dupRe);
+          if(dm) rest = rest.slice(dm[0].length);
+          let text = rest.trim();
+          if(!text && lines[i+1] && !tsRe.test(lines[i+1])){
+            text = lines[i+1].trim();
+            i++; // this entry's text was on its own line (older transcript panel layout)
+          }
+          if(text) result.push({start, text});
+        } else if(result.length > 0){
+          // no timestamp on this line: treat as a wrapped continuation of the previous caption
+          result[result.length-1].text += (line.startsWith('。')||line.startsWith('、') ? '' : ' ') + line;
+        }
+        i++;
+      }
+    }
+
+    result.sort((a,b) => a.start - b.start);
+    for(let i=0;i<result.length;i++){
+      result[i].end = (i+1 < result.length) ? result[i+1].start : result[i].start + 6;
+    }
+    return result.filter(e => e.text && e.text.length > 0);
+  }
+
+  // ---------- scoring ----------
+  function levenshtein(a,b){
+    const m=a.length, n=b.length;
+    if(m===0) return n;
+    if(n===0) return m;
+    const dp = new Array(n+1);
+    for(let j=0;j<=n;j++) dp[j]=j;
+    for(let i=1;i<=m;i++){
+      let prev = dp[0];
+      dp[0] = i;
+      for(let j=1;j<=n;j++){
+        const tmp = dp[j];
+        dp[j] = (a[i-1]===b[j-1]) ? prev : 1 + Math.min(prev, dp[j], dp[j-1]);
+        prev = tmp;
+      }
+    }
+    return dp[n];
+  }
+  function similarity(a,b){
+    if(a.length===0 && b.length===0) return 1;
+    const dist = levenshtein(a,b);
+    const maxLen = Math.max(a.length, b.length, 1);
+    return Math.max(0, 1 - dist/maxLen);
+  }
+
+  // ---------- gauge ----------
+  function drawGaugeBase(){
+    const svg = document.getElementById('gauge');
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#2FE6A6"/>
+          <stop offset="35%" stop-color="#2FE6A6"/>
+          <stop offset="60%" stop-color="#FFB020"/>
+          <stop offset="100%" stop-color="#FF5A5F"/>
+        </linearGradient>
+      </defs>
+      <rect x="10" y="38" width="580" height="14" rx="3" fill="url(#gaugeGrad)" opacity="0.85"/>
+      <line x1="10" y1="30" x2="10" y2="62" stroke="#7C8A90" stroke-width="1.5"/>
+      <text x="10" y="24" fill="#7C8A90" font-family="JetBrains Mono" font-size="11" text-anchor="middle">0.0s</text>
+      <line x1="300" y1="30" x2="300" y2="62" stroke="#7C8A90" stroke-width="1.5"/>
+      <text x="300" y="24" fill="#7C8A90" font-family="JetBrains Mono" font-size="11" text-anchor="middle">2.5s</text>
+      <line x1="590" y1="30" x2="590" y2="62" stroke="#7C8A90" stroke-width="1.5"/>
+      <text x="590" y="24" fill="#7C8A90" font-family="JetBrains Mono" font-size="11" text-anchor="middle">5.0s+</text>
+      <polygon id="needle" class="needle" points="10,68 4,84 16,84" fill="#E7ECEE" transform="translate(0,0)"/>
+      <text id="needleLabel" x="10" y="98" fill="#E7ECEE" font-family="JetBrains Mono" font-size="12" text-anchor="middle" font-weight="700">—</text>
+    `;
+  }
+  function updateGauge(lagSec){
+    const needle = document.getElementById('needle');
+    const needleLabel = document.getElementById('needleLabel');
+    if(!needle) return;
+    const clamped = Math.max(0, Math.min(5, Math.abs(lagSec)));
+    const x = 10 + (clamped/5)*580;
+    needle.setAttribute('transform', `translate(${x-10},0)`);
+    needleLabel.setAttribute('x', x);
+    needleLabel.textContent = (lagSec>=0?'+':'') + lagSec.toFixed(2) + 's';
+  }
+
+  // ---------- YouTube API ----------
+  function loadYouTubeAPI(cb){
+    if(window.YT && window.YT.Player){ cb(); return; }
+    window.onYouTubeIframeAPIReady = cb;
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+  }
+
+  // ---------- game flow ----------
+  function createPlayer(videoId, onReady){
+    loadYouTubeAPI(function(){
+      player = new YT.Player('playerHost', {
+        videoId: videoId,
+        playerVars: { rel:0, modestbranding:1 },
+        events: {
+          'onReady': function(){ onReady(); },
+          'onStateChange': function(e){
+            if(e.data === YT.PlayerState.ENDED && testing){
+              finishSession();
+            }
+          }
+        }
+      });
+    });
+  }
+
+  function beginTypingTest(entriesArg){
+    entries = entriesArg;
+    submittedFlags = new Array(entries.length).fill(false);
+    activeIndex = -1;
+    log = [];
+    testing = true;
+
+    builderPanel.classList.add('hidden');
+    setupPanel.classList.add('hidden');
+    gamePanel.classList.remove('hidden');
+
+    typeInput.disabled = false;
+    typeInput.value = '';
+    cgText.innerHTML = '<span class="cg-waiting">映像を再生すると、ここに現在の字幕が表示されます</span>';
+    cgNext.textContent = '';
+    drawGaugeBase();
+    updateLiveStats();
+
+    if(pollTimer) clearInterval(pollTimer);
+    player.seekTo(0, true);
+    player.playVideo();
+    pollTimer = setInterval(tick, 100);
+  }
+
+  function tick(){
+    if(!player || typeof player.getCurrentTime !== 'function') return;
+    const t = player.getCurrentTime();
+    tcDisplay.textContent = fmtTime(t);
+
+    // find current line index (largest start <= t)
+    let idx = activeIndex;
+    while(idx+1 < entries.length && entries[idx+1].start <= t){
+      idx++;
+    }
+    if(idx !== activeIndex){
+      // finalize the line we're leaving, if never submitted
+      if(activeIndex >= 0 && !submittedFlags[activeIndex]){
+        recordLine(activeIndex, typeInput.value, entries[activeIndex].end, true);
+      }
+      activeIndex = idx;
+      renderTarget();
+      typeInput.value = '';
+      typeInput.classList.remove('correct','wrong');
+    }
+  }
+
+  function renderTarget(){
+    if(activeIndex < 0 || activeIndex >= entries.length){
+      cgText.innerHTML = '<span class="cg-waiting">映像を再生すると、ここに現在の字幕が表示されます</span>';
+      cgNext.textContent = '';
+      return;
+    }
+    cgText.textContent = entries[activeIndex].text;
+    const nxt = entries[activeIndex+1];
+    cgNext.textContent = nxt ? ('次: ' + nxt.text) : '（最終行）';
+  }
+
+  function recordLine(idx, typedRaw, actualTime, isTimeout){
+    if(submittedFlags[idx]) return;
+    submittedFlags[idx] = true;
+    const expected = entries[idx].text;
+    const typed = (typedRaw || '').trim();
+    const acc = similarity(typed, expected);
+    const lag = actualTime - entries[idx].start;
+    log.push({
+      idx, start: entries[idx].start, expected, typed,
+      acc, lag, status: isTimeout ? 'miss' : 'ok'
+    });
+    updateLiveStats();
+  }
+
+  function updateLiveStats(){
+    if(log.length === 0){
+      statAcc.textContent = '—';
+      statLag.textContent = '—';
+      statCount.textContent = '0 / ' + entries.length;
+      return;
+    }
+    let totalDist=0, totalLen=0, lagSum=0;
+    for(const r of log){
+      totalDist += Math.round((1-r.acc) * Math.max(r.expected.length, r.typed.length, 1));
+      totalLen += Math.max(r.expected.length, r.typed.length, 1);
+      lagSum += r.lag;
+    }
+    const overallAcc = totalLen>0 ? (1 - totalDist/totalLen) : 1;
+    const avgLag = lagSum/log.length;
+    statAcc.textContent = (overallAcc*100).toFixed(1) + '%';
+    statAcc.className = 'v ' + (overallAcc>0.85?'good':overallAcc>0.6?'warn':'bad');
+    statLag.textContent = (avgLag>=0?'+':'') + avgLag.toFixed(2) + 's';
+    statLag.className = 'v ' + (Math.abs(avgLag)<1.5?'good':Math.abs(avgLag)<3?'warn':'bad');
+    statCount.textContent = log.length + ' / ' + entries.length;
+    updateGauge(log[log.length-1].lag);
+  }
+
+  typeInput.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    if(activeIndex < 0 || activeIndex >= entries.length) return;
+    if(submittedFlags[activeIndex]) return;
+    const t = player.getCurrentTime();
+    const expected = entries[activeIndex].text;
+    const typed = typeInput.value.trim();
+    const acc = similarity(typed, expected);
+    typeInput.classList.toggle('correct', acc > 0.85);
+    typeInput.classList.toggle('wrong', acc <= 0.85);
+    recordLine(activeIndex, typed, t, false);
+  });
+
+  function finishSession(){
+    clearInterval(pollTimer);
+    testing = false;
+    if(activeIndex >= 0 && activeIndex < entries.length && !submittedFlags[activeIndex]){
+      const t = player && player.getCurrentTime ? player.getCurrentTime() : entries[activeIndex].end;
+      recordLine(activeIndex, typeInput.value, t, true);
+    }
+    renderResults();
+    gamePanel.classList.add('hidden');
+    resultsPanel.classList.remove('hidden');
+  }
+
+  function renderResults(){
+    let totalDist=0, totalLen=0, lagSum=0, missCount=0;
+    for(const r of log){
+      totalDist += Math.round((1-r.acc) * Math.max(r.expected.length, r.typed.length, 1));
+      totalLen += Math.max(r.expected.length, r.typed.length, 1);
+      lagSum += r.lag;
+      if(r.status === 'miss') missCount++;
+    }
+    const overallAcc = totalLen>0 ? (1 - totalDist/totalLen) : 0;
+    const avgLag = log.length>0 ? lagSum/log.length : 0;
+    const lagScore = Math.max(0, 100 - Math.abs(avgLag)*20);
+    const finalScore = Math.round(overallAcc*100*0.7 + lagScore*0.3);
+
+    document.getElementById('finalScore').innerHTML = finalScore + '<span class="unit">/ 100</span>';
+    document.getElementById('finalAcc').textContent = (overallAcc*100).toFixed(1) + '%';
+    document.getElementById('finalLag').textContent = (avgLag>=0?'+':'') + avgLag.toFixed(2) + 's';
+    document.getElementById('finalMiss').textContent = missCount + ' / ' + log.length;
+
+    const body = document.getElementById('logBody');
+    body.innerHTML = '';
+    log.forEach((r,i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${fmtTime(r.start)}</td>
+        <td>${escapeHtml(r.expected)}</td>
+        <td>${escapeHtml(r.typed) || '<span style="color:var(--text-muted)">（未入力）</span>'}</td>
+        <td>${(r.acc*100).toFixed(0)}%</td>
+        <td>${(r.lag>=0?'+':'')}${r.lag.toFixed(2)}s</td>
+        <td><span class="tag ${r.status==='ok'?'ok':'miss'}">${r.status==='ok'?'OK':'MISS'}</span></td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function downloadCSV(){
+    const rows = [['#','想定TC(秒)','正解テキスト','入力テキスト','正解率(%)','ラグ(秒)','判定']];
+    log.forEach((r,i) => {
+      rows.push([i+1, r.start.toFixed(2), r.expected, r.typed, (r.acc*100).toFixed(1), r.lag.toFixed(2), r.status]);
+    });
+    const csv = rows.map(row => row.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+    const blob = new Blob(["\uFEFF" + csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'caption-sync-log.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- builder mode ----------
+  function renderBuilderList(){
+    const wrap = document.getElementById('builderList');
+    if(builderEntries.length === 0){
+      wrap.innerHTML = '<div class="hint" style="margin:12px;">まだ記録されていません。</div>';
+      document.getElementById('startFromBuilderBtn').disabled = true;
+      return;
+    }
+    document.getElementById('startFromBuilderBtn').disabled = false;
+    const sorted = builderEntries.slice().sort((a,b) => a.start - b.start);
+    wrap.innerHTML = '';
+    sorted.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'builder-item';
+      row.innerHTML = `<span class="btime">${fmtTime(item.start)}</span><span class="btext">${escapeHtml(item.text)}</span><button class="bdel" data-id="${item.id}">削除</button>`;
+      wrap.appendChild(row);
+    });
+    wrap.querySelectorAll('.bdel').forEach(btn => {
+      btn.addEventListener('click', function(){
+        const id = Number(this.getAttribute('data-id'));
+        builderEntries = builderEntries.filter(e => e.id !== id);
+        renderBuilderList();
+      });
+    });
+  }
+
+  builderInput.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    const text = this.value.trim();
+    if(!text || !player || typeof player.getCurrentTime !== 'function') return;
+    builderEntries.push({ id: builderIdSeq++, start: player.getCurrentTime(), text });
+    renderBuilderList();
+    this.value = '';
+  });
+
+  document.getElementById('startFromBuilderBtn').addEventListener('click', function(){
+    if(builderEntries.length === 0) return;
+    const sorted = builderEntries.slice().sort((a,b) => a.start - b.start);
+    const built = sorted.map(e => ({ start: e.start, text: e.text }));
+    for(let i=0;i<built.length;i++){
+      built[i].end = (i+1 < built.length) ? built[i+1].start : built[i].start + 6;
+    }
+    beginTypingTest(built);
+  });
+
+  document.getElementById('builderBackBtn').addEventListener('click', function(){
+    builderPanel.classList.add('hidden');
+    videoArea.classList.add('hidden');
+    setupPanel.classList.remove('hidden');
+    builderEntries = [];
+    renderBuilderList();
+    if(player && player.destroy) player.destroy();
+    player = null;
+  });
+
+  document.getElementById('loadForBuilderBtn').addEventListener('click', function(){
+    setupError.textContent = '';
+    const vid = extractVideoId(document.getElementById('videoUrl').value);
+    if(!vid){
+      setupError.textContent = '動画URLまたは動画IDを正しく入力してください。';
+      return;
+    }
+    builderEntries = [];
+    renderBuilderList();
+    videoArea.classList.remove('hidden');
+    createPlayer(vid, function(){
+      setupPanel.classList.add('hidden');
+      builderPanel.classList.remove('hidden');
+      builderInput.disabled = false;
+      builderInput.focus();
+    });
+  });
+
+  // ---------- wiring: paste mode ----------
+  document.getElementById('startBtn').addEventListener('click', function(){
+    setupError.textContent = '';
+    const vid = extractVideoId(document.getElementById('videoUrl').value);
+    if(!vid){
+      setupError.textContent = '動画URLまたは動画IDを正しく入力してください。';
+      return;
+    }
+    const raw = document.getElementById('transcriptBox').value;
+    const parsed = parseTranscript(raw);
+    if(parsed.length === 0){
+      setupError.textContent = 'スクリプトを解析できませんでした。タイムスタンプ付きのテキストを貼り付けるか、下の手動作成モードを使ってください。';
+      return;
+    }
+    videoArea.classList.remove('hidden');
+    createPlayer(vid, function(){
+      beginTypingTest(parsed);
+    });
+  });
+
+  document.getElementById('finishBtn').addEventListener('click', finishSession);
+  document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
+  document.getElementById('restartBtn').addEventListener('click', function(){
+    resultsPanel.classList.add('hidden');
+    videoArea.classList.add('hidden');
+    setupPanel.classList.remove('hidden');
+    testing = false;
+    builderEntries = [];
+    renderBuilderList();
+    if(pollTimer) clearInterval(pollTimer);
+    if(player && player.destroy) player.destroy();
+    player = null;
+  });
+
+})();
+</script>
+</body>
+</html>
